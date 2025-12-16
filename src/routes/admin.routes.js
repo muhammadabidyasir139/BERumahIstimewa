@@ -1,0 +1,43 @@
+const express = require("express");
+const router = express.Router();
+const verifyJWT = require("../middlewares/auth");
+const upload = require("../middlewares/upload");
+
+const {
+  getAllVillas,
+  createVillaByAdmin,
+  approveVilla,
+  rejectVilla,
+  inactiveVilla,
+  deleteVilla,
+  getAllUsers,
+  updateUserStatus,
+} = require("../controllers/admin.controller");
+
+// Middleware untuk admin only
+function adminOnly(req, res, next) {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Akses hanya untuk admin" });
+  }
+  next();
+}
+
+// Villa Management
+router.post(
+  "/villas",
+  verifyJWT,
+  adminOnly,
+  upload.array("photos", 10),
+  createVillaByAdmin
+);
+router.get("/villas", verifyJWT, adminOnly, getAllVillas);
+router.put("/villas/:id/approve", verifyJWT, adminOnly, approveVilla);
+router.put("/villas/:id/reject", verifyJWT, adminOnly, rejectVilla);
+router.put("/villas/:id/inactive", verifyJWT, adminOnly, inactiveVilla);
+router.delete("/villas/:id", verifyJWT, adminOnly, deleteVilla);
+
+// User Management
+router.get("/users", verifyJWT, adminOnly, getAllUsers);
+router.put("/users/:id/status", verifyJWT, adminOnly, updateUserStatus);
+
+module.exports = router;
