@@ -1,0 +1,4 @@
+- [x] Modify getAllVillas function to accept query parameters 'name' and 'location'
+- [x] Update SQL query to include WHERE conditions for name and location if provided
+- [x] Use ILIKE for case-insensitive partial matching
+- [x] Test the endpoint with query parameters
