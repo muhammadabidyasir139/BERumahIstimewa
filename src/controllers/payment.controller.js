@@ -72,6 +72,13 @@ exports.midtransNotification = (req, res) => {
 
     const bookingId = result[0]["bookingid"];
 
+    console.log(
+      "Updating booking status for bookingId:",
+      bookingId,
+      "to newStatus based on transaction_status:",
+      transaction_status
+    );
+
     // 4. Tentukan status booking berdasarkan transaction_status
     let newStatus = "waiting_payment";
     if (
@@ -87,11 +94,18 @@ exports.midtransNotification = (req, res) => {
       newStatus = "cancelled";
     }
 
+    console.log("New status for booking:", newStatus);
+
     const updateBookingQuery = "UPDATE bookings SET status = $1 WHERE id = $2";
 
     db.query(updateBookingQuery, [newStatus, bookingId], (err2) => {
       if (err2) {
         console.log("Gagal update status booking:", err2);
+      } else {
+        console.log(
+          "Booking status updated successfully for bookingId:",
+          bookingId
+        );
       }
 
       // Midtrans hanya butuh response 200 OK
