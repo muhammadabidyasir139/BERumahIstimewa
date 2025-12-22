@@ -70,7 +70,7 @@ exports.midtransNotification = (req, res) => {
       return res.json({ message: "OK" });
     }
 
-    const bookingId = result[0].bookingId;
+    const bookingId = result[0]["bookingid"];
 
     // 4. Tentukan status booking berdasarkan transaction_status
     let newStatus = "waiting_payment";

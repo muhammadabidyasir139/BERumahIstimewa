@@ -133,14 +133,14 @@ exports.createBooking = async (req, res) => {
 
     // 9. Simpan record payment (status awal pending)
     const insertPaymentQuery = `
-      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus, redirectUrl)
+      VALUES ($1, $2, $3, $4, $5)
     `;
 
     await new Promise((resolve, reject) => {
       db.query(
         insertPaymentQuery,
-        [bookingId, orderId, totalAmount, "pending"],
+        [bookingId, orderId, totalAmount, "pending", redirectUrl],
         (err) => {
           if (err) return reject(err);
           resolve();
@@ -172,9 +172,10 @@ exports.getMyBookings = (req, res) => {
   const userId = req.user.id;
 
   const query = `
-    SELECT bookings.*, villas.name AS villaName, villas.location
+    SELECT bookings.*, villas.name AS villaName, villas.location, payments.redirectUrl AS directUrl
     FROM bookings
     JOIN villas ON villas.id = bookings.villaId
+    LEFT JOIN payments ON payments.bookingId = bookings.id
     WHERE bookings.userId = $1
     ORDER BY bookings.id DESC
   `;
