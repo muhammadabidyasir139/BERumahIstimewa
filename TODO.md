@@ -1,9 +1,14 @@
-# TODO: Resolve GitHub Push Blockage Due to Secret Detection
+# Task: Add payment response fields to GET /bookings/my endpoint
 
-- [x] Remove node_modules from Git tracking using `git rm -r --cached node_modules`
-- [x] Commit the removal with message "Remove node_modules from tracking to resolve secret detection"
-- [x] Attempt to push to GitHub using `git push -u origin main` (Push failed due to secret in previous commit)
-- [x] If push still blocked, visit the provided URL to allow the secret: https://github.com/muhammadabidyasir139/BERumahIstimewa/security/secret-scanning/unblock-secret/37K0rXkjhrpQIBsDW1fDSigIn0s (Secret allowed, push succeeded)
-- [x] Update s3.js to use environment variables instead of hardcoded secrets
-- [x] Create .env file with S3 credentials
-- [x] Commit the s3.js changes and push to GitHub
+## Completed Steps:
+
+- [x] Analyze the codebase and understand the structure
+- [x] Verify payments table relation with bookings via bookingId
+- [x] Modify createBooking function to store token and redirectUrl in payments table
+- [x] Modify getMyBookings function to join with payments table and include payment fields in response
+- [x] Transform response to include payment object with orderId, token, redirectUrl
+
+## Followup Steps:
+
+- [ ] Test the endpoints to ensure the response includes the payment fields for each booking
+- [ ] If database migration is needed for token and redirectUrl columns, perform it

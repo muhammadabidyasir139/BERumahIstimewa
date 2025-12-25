@@ -133,14 +133,14 @@ exports.createBooking = async (req, res) => {
 
     // 9. Simpan record payment (status awal pending)
     const insertPaymentQuery = `
-      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus, token, redirectUrl)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `;
 
     await new Promise((resolve, reject) => {
       db.query(
         insertPaymentQuery,
-        [bookingId, orderId, totalAmount, "pending"],
+        [bookingId, orderId, totalAmount, "pending", token, redirectUrl],
         (err) => {
           if (err) return reject(err);
           resolve();
@@ -172,8 +172,9 @@ exports.getMyBookings = (req, res) => {
   const userId = req.user.id;
 
   const query = `
-    SELECT bookings.*, villas.name AS villaName, villas.location
+    SELECT bookings.*, villas.name AS villaName, villas.location, payments.orderId, payments.token, payments.redirectUrl
     FROM bookings
+    LEFT JOIN payments ON payments.bookingId = bookings.id
     JOIN villas ON villas.id = bookings.villaId
     WHERE bookings.userId = $1
     ORDER BY bookings.id DESC
@@ -185,6 +186,23 @@ exports.getMyBookings = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data booking" });
     }
 
-    return res.json(result.rows);
+    // Transform the result to include payment object
+    const bookings = result.rows.map((row) => ({
+      ...row,
+      payment: {
+        orderId: row.orderid,
+        token: row.token,
+        redirectUrl: row.redirecturl,
+      },
+    }));
+
+    // Remove the individual payment fields from the top level
+    bookings.forEach((booking) => {
+      delete booking.orderid;
+      delete booking.token;
+      delete booking.redirecturl;
+    });
+
+    return res.json(bookings);
   });
 };
