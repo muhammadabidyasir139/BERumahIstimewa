@@ -69,18 +69,36 @@ exports.addVilla = async (req, res) => {
 
 // GET OWNER VILLAS
 exports.getOwnerVillas = (req, res) => {
-  const ownerId = req.user.id;
+  const userId = req.user.id;
+  const userRole = req.user.role;
 
-  const query = `
-    SELECT v.*, GROUP_CONCAT(vp.fileName) AS photos
-    FROM villas v
-    LEFT JOIN villa_photos vp ON vp.villaId = v.id
-    WHERE v.ownerId = ?
-    GROUP BY v.id
-    ORDER BY v.id DESC
-  `;
+  let query;
+  let params;
 
-  db.query(query, [ownerId], (err, result) => {
+  if (userRole === "admin") {
+    // Admin can see all villas
+    query = `
+      SELECT v.*, GROUP_CONCAT(vp.fileName) AS photos
+      FROM villas v
+      LEFT JOIN villa_photos vp ON vp.villaId = v.id
+      GROUP BY v.id
+      ORDER BY v.id DESC
+    `;
+    params = [];
+  } else {
+    // Owner/customer can only see their own villas
+    query = `
+      SELECT v.*, GROUP_CONCAT(vp.fileName) AS photos
+      FROM villas v
+      LEFT JOIN villa_photos vp ON vp.villaId = v.id
+      WHERE v.ownerId = ?
+      GROUP BY v.id
+      ORDER BY v.id DESC
+    `;
+    params = [userId];
+  }
+
+  db.query(query, params, (err, result) => {
     if (err) {
       console.log(err);
       return res.status(500).json({ message: "Gagal mengambil data villa" });
@@ -104,13 +122,23 @@ exports.getOwnerVillas = (req, res) => {
 
 exports.updateVilla = (req, res) => {
   const { id } = req.params;
-  const ownerId = req.user.id;
+  const userId = req.user.id;
+  const userRole = req.user.role;
   const updatedData = req.body;
 
-  // Ambil status villa dulu
-  const checkQuery = "SELECT status FROM villas WHERE id = ? AND ownerId = ?";
+  // Build the check query based on role
+  let checkQuery;
+  let checkParams;
 
-  db.query(checkQuery, [id, ownerId], (err, result) => {
+  if (userRole === "admin") {
+    checkQuery = "SELECT status FROM villas WHERE id = ?";
+    checkParams = [id];
+  } else {
+    checkQuery = "SELECT status FROM villas WHERE id = ? AND ownerId = ?";
+    checkParams = [id, userId];
+  }
+
+  db.query(checkQuery, checkParams, (err, result) => {
     if (err)
       return res.status(500).json({ message: "Gagal mengambil data villa" });
 
@@ -134,9 +162,18 @@ exports.updateVilla = (req, res) => {
     }
 
     // Jika pending → edit biasa tanpa mengubah status
-    const updateQuery = "UPDATE villas SET ? WHERE id = ? AND ownerId = ?";
+    let updateQuery;
+    let updateParams;
 
-    db.query(updateQuery, [updatedData, id, ownerId], (err2) => {
+    if (userRole === "admin") {
+      updateQuery = "UPDATE villas SET ? WHERE id = ?";
+      updateParams = [updatedData, id];
+    } else {
+      updateQuery = "UPDATE villas SET ? WHERE id = ? AND ownerId = ?";
+      updateParams = [updatedData, id, userId];
+    }
+
+    db.query(updateQuery, updateParams, (err2) => {
       if (err2) {
         console.log(err2);
         return res.status(500).json({ message: "Gagal update villa" });
@@ -149,11 +186,22 @@ exports.updateVilla = (req, res) => {
 
 exports.deleteVilla = (req, res) => {
   const { id } = req.params;
-  const ownerId = req.user.id;
+  const userId = req.user.id;
+  const userRole = req.user.role;
 
-  const query = "SELECT status FROM villas WHERE id = ? AND ownerId = ?";
+  // Build the check query based on role
+  let checkQuery;
+  let checkParams;
 
-  db.query(query, [id, ownerId], (err, result) => {
+  if (userRole === "admin") {
+    checkQuery = "SELECT status FROM villas WHERE id = ?";
+    checkParams = [id];
+  } else {
+    checkQuery = "SELECT status FROM villas WHERE id = ? AND ownerId = ?";
+    checkParams = [id, userId];
+  }
+
+  db.query(checkQuery, checkParams, (err, result) => {
     if (err)
       return res.status(500).json({ message: "Gagal mengambil data villa" });
 
@@ -171,16 +219,23 @@ exports.deleteVilla = (req, res) => {
       });
     }
 
-    db.query(
-      "DELETE FROM villas WHERE id = ? AND ownerId = ?",
-      [id, ownerId],
-      (err2) => {
-        if (err2)
-          return res.status(500).json({ message: "Gagal menghapus villa" });
+    let deleteQuery;
+    let deleteParams;
 
-        res.json({ message: "Villa berhasil dihapus" });
-      }
-    );
+    if (userRole === "admin") {
+      deleteQuery = "DELETE FROM villas WHERE id = ?";
+      deleteParams = [id];
+    } else {
+      deleteQuery = "DELETE FROM villas WHERE id = ? AND ownerId = ?";
+      deleteParams = [id, userId];
+    }
+
+    db.query(deleteQuery, deleteParams, (err2) => {
+      if (err2)
+        return res.status(500).json({ message: "Gagal menghapus villa" });
+
+      res.json({ message: "Villa berhasil dihapus" });
+    });
   });
 };
 

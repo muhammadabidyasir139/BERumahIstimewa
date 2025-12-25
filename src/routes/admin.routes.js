@@ -12,6 +12,8 @@ const {
   deleteVilla,
   getAllUsers,
   updateUserStatus,
+  getRevenue,
+  getAllTransactions,
 } = require("../controllers/admin.controller");
 
 // Middleware untuk admin only
