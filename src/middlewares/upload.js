@@ -2,14 +2,14 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 
-// lokasi simpan file
+// lokasi simpan file (untuk serverless, gunakan /tmp)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = "uploads/";
+    const uploadPath = "/tmp/uploads";
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
-    cb(null, uploadPath); // pastikan folder ini ada
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const uniqueName =
