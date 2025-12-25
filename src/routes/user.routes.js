@@ -7,9 +7,7 @@ const {
   getProfile,
   updateProfile,
   changePassword,
-  addToWishlist,
-  removeFromWishlist,
-  getWishlist,
+  getTransactionHistory,
 } = require("../controllers/user.controller");
 
 // Get user profile
