@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middlewares/auth");
+const verifyOwner = require("../middlewares/owner");
 const upload = require("../middlewares/upload");
 
 const {
@@ -15,12 +16,13 @@ const {
 router.post(
   "/villas",
   verifyJWT,
+  verifyOwner,
   upload.array("photos", 10), // max 10 file per request, bisa kamu naikkan
   addVilla
 );
-router.get("/villas", verifyJWT, getOwnerVillas);
-router.put("/villas/:id", verifyJWT, updateVilla);
-router.delete("/villas/:id", verifyJWT, deleteVilla);
-router.get("/bookings", verifyJWT, getOwnerBookings);
+router.get("/villas", verifyJWT, verifyOwner, getOwnerVillas);
+router.put("/villas/:id", verifyJWT, verifyOwner, updateVilla);
+router.delete("/villas/:id", verifyJWT, verifyOwner, deleteVilla);
+router.get("/bookings", verifyJWT, verifyOwner, getOwnerBookings);
 
 module.exports = router;
