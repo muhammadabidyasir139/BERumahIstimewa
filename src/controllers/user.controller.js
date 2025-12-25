@@ -40,61 +40,82 @@ exports.updateProfile = (req, res) => {
   const { name, email, phone } = req.body;
   const photo = req.file ? req.file.filename : null;
 
-  if (!name || !email) {
-    return res.status(400).json({ message: "Nama dan email wajib diisi" });
+  // Check if at least one field is provided
+  if (!name && !email && phone === undefined && !photo) {
+    return res
+      .status(400)
+      .json({ message: "Setidaknya satu field harus diisi" });
   }
 
-  // Cek apakah email sudah digunakan user lain
-  db.query(
-    "SELECT id FROM users WHERE email = $1 AND id != $2",
-    [email, userId],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).json({ message: "Gagal memverifikasi email" });
-      }
-
-      if (result.length > 0) {
-        return res.status(400).json({ message: "Email sudah digunakan" });
-      }
-
-      // Update profil
-      const updateFields = [];
-      const updateValues = [];
-      let paramCount = 1;
-
-      updateFields.push(`name = $${paramCount++}`);
-      updateValues.push(name);
-
-      updateFields.push(`email = $${paramCount++}`);
-      updateValues.push(email);
-
-      if (phone !== undefined) {
-        updateFields.push(`phone = $${paramCount++}`);
-        updateValues.push(phone);
-      }
-
-      if (photo) {
-        updateFields.push(`photo = $${paramCount++}`);
-        updateValues.push(photo);
-      }
-
-      updateValues.push(userId);
-
-      const query = `UPDATE users SET ${updateFields.join(
-        ", "
-      )} WHERE id = $${paramCount}`;
-
-      db.query(query, updateValues, (err, result) => {
+  // If email is provided, check if it's already used by another user
+  if (email) {
+    db.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [email, userId],
+      (err, result) => {
         if (err) {
           console.log(err);
-          return res.status(500).json({ message: "Gagal update profil" });
+          return res.status(500).json({ message: "Gagal memverifikasi email" });
         }
 
-        return res.json({ message: "Profil berhasil diupdate" });
-      });
+        if (result.length > 0) {
+          return res.status(400).json({ message: "Email sudah digunakan" });
+        }
+
+        // Proceed to update
+        performUpdate();
+      }
+    );
+  } else {
+    // No email provided, proceed to update
+    performUpdate();
+  }
+
+  function performUpdate() {
+    // Update profil
+    const updateFields = [];
+    const updateValues = [];
+    let paramCount = 1;
+
+    if (name) {
+      updateFields.push(`name = $${paramCount++}`);
+      updateValues.push(name);
     }
-  );
+
+    if (email) {
+      updateFields.push(`email = $${paramCount++}`);
+      updateValues.push(email);
+    }
+
+    if (phone !== undefined) {
+      updateFields.push(`phone = $${paramCount++}`);
+      updateValues.push(phone);
+    }
+
+    if (photo) {
+      updateFields.push(`photo = $${paramCount++}`);
+      updateValues.push(photo);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: "Tidak ada field yang diupdate" });
+    }
+
+    updateValues.push(userId);
+
+    const query = `UPDATE users SET ${updateFields.join(
+      ", "
+    )} WHERE id = $${paramCount}`;
+
+    db.query(query, updateValues, (err, result) => {
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ message: "Gagal update profil" });
+      }
+
+      return res.json({ message: "Profil berhasil diupdate" });
+    });
+  }
 };
 
 // Change password
