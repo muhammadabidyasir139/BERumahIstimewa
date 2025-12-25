@@ -10,6 +10,7 @@ app.use(express.json());
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", require("./routes/user.routes"));
+app.use("/api/v1/wishlist", require("./routes/wishlist.routes"));
 app.get("/", (req, res) => {
   res.send("Villa Booking API Running...");
 });
