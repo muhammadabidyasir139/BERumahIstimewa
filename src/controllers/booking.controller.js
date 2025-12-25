@@ -172,12 +172,30 @@ exports.getMyBookings = (req, res) => {
   const userId = req.user.id;
 
   const query = `
-    SELECT bookings.*, villas.name AS villaName, villas.location, payments.orderId, payments.token, payments.redirectUrl
-    FROM bookings
-    LEFT JOIN payments ON payments.bookingId = bookings.id
-    JOIN villas ON villas.id = bookings.villaId
-    WHERE bookings.userId = $1
-    ORDER BY bookings.id DESC
+    SELECT
+      p.id AS payment_id,
+      p.bookingid,
+      p.orderid,
+      p.transactionid,
+      p.paymenttype,
+      p.grossamount,
+      p.transactionstatus,
+      p.transactiontime,
+      p.rawresponse,
+      p.createdat,
+      p.token,
+
+      b.id AS booking_id,
+      b.userid,
+      b.villaid,
+      b.checkin,
+      b.checkout,
+      b.status AS booking_status,
+      b.totalamount AS booking_totalamount
+
+    FROM payments p
+    INNER JOIN bookings b ON p.bookingid = b.id
+    WHERE b.userid = $1
   `;
 
   db.query(query, [userId], (err, result) => {
@@ -186,21 +204,45 @@ exports.getMyBookings = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data booking" });
     }
 
-    // Transform the result to include payment object
-    const bookings = result.rows.map((row) => ({
-      ...row,
-      payment: {
-        orderId: row.orderid,
-        token: row.token,
-        redirectUrl: row.redirecturl,
-      },
-    }));
+    // Transform the result to include payment object with redirectUrl from rawresponse
+    const bookings = result.rows.map((row) => {
+      let redirectUrl = null;
+      if (row.rawresponse) {
+        try {
+          const rawResponse = JSON.parse(row.rawresponse);
+          redirectUrl = rawResponse.redirect_url || null;
+        } catch (parseError) {
+          console.log("Error parsing rawresponse:", parseError);
+        }
+      }
 
-    // Remove the individual payment fields from the top level
-    bookings.forEach((booking) => {
-      delete booking.orderid;
-      delete booking.token;
-      delete booking.redirecturl;
+      return {
+        payment_id: row.payment_id,
+        bookingid: row.bookingid,
+        orderid: row.orderid,
+        transactionid: row.transactionid,
+        paymenttype: row.paymenttype,
+        grossamount: row.grossamount,
+        transactionstatus: row.transactionstatus,
+        transactiontime: row.transactiontime,
+        rawresponse: row.rawresponse,
+        createdat: row.createdat,
+        token: row.token,
+
+        booking_id: row.booking_id,
+        userid: row.userid,
+        villaid: row.villaid,
+        checkin: row.checkin,
+        checkout: row.checkout,
+        booking_status: row.booking_status,
+        booking_totalamount: row.booking_totalamount,
+
+        payment: {
+          orderId: row.orderid,
+          token: row.token,
+          redirectUrl: redirectUrl,
+        },
+      };
     });
 
     return res.json(bookings);
