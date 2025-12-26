@@ -40,6 +40,9 @@ exports.updateProfile = (req, res) => {
   const { name, email, phone } = req.body;
   const photo = req.file ? req.file.location : null; // Use location for S3 URL
 
+  console.log("Update profile - req.file:", req.file);
+  console.log("Update profile - photo value:", photo);
+
   // Check if at least one field is provided
   if (!name && !email && phone === undefined && !photo) {
     return res
