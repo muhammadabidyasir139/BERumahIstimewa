@@ -133,14 +133,22 @@ exports.createBooking = async (req, res) => {
 
     // 9. Simpan record payment (status awal pending)
     const insertPaymentQuery = `
-      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus, token, redirectUrl)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus, token, redirectUrl, rawResponse)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
     `;
 
     await new Promise((resolve, reject) => {
       db.query(
         insertPaymentQuery,
-        [bookingId, orderId, totalAmount, "pending", token, redirectUrl],
+        [
+          bookingId,
+          orderId,
+          totalAmount,
+          "pending",
+          token,
+          redirectUrl,
+          JSON.stringify({ redirect_url: redirectUrl }),
+        ],
         (err) => {
           if (err) return reject(err);
           resolve();
@@ -184,6 +192,7 @@ exports.getMyBookings = (req, res) => {
       p.rawresponse,
       p.createdat,
       p.token,
+      p.redirecturl,
 
       b.id AS booking_id,
       b.userid,
@@ -204,18 +213,8 @@ exports.getMyBookings = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data booking" });
     }
 
-    // Transform the result to include payment object with redirectUrl from rawresponse
+    // Transform the result to include payment object with redirectUrl from database column
     const bookings = result.rows.map((row) => {
-      let redirectUrl = null;
-      if (row.rawresponse) {
-        try {
-          const rawResponse = JSON.parse(row.rawresponse);
-          redirectUrl = rawResponse.redirect_url || null;
-        } catch (parseError) {
-          console.log("Error parsing rawresponse:", parseError);
-        }
-      }
-
       return {
         payment_id: row.payment_id,
         bookingid: row.bookingid,
@@ -240,7 +239,7 @@ exports.getMyBookings = (req, res) => {
         payment: {
           orderId: row.orderid,
           token: row.token,
-          redirectUrl: redirectUrl,
+          redirectUrl: row.redirecturl,
         },
       };
     });
