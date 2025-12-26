@@ -38,7 +38,7 @@ exports.getProfile = (req, res) => {
 exports.updateProfile = (req, res) => {
   const userId = req.user.id;
   const { name, email, phone } = req.body;
-  const photo = req.file ? req.file.filename : null;
+  const photo = req.file ? req.file.location : null; // Use location for S3 URL
 
   // Check if at least one field is provided
   if (!name && !email && phone === undefined && !photo) {
