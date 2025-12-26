@@ -10,12 +10,21 @@ AWS.config.update({
   region: process.env.AWS_REGION || "us-east-1",
 });
 
-const endpoint = process.env.AWS_S3_ENDPOINT || "https://is3.cloudhost.id";
+let endpoint = process.env.AWS_S3_ENDPOINT || "https://is3.cloudhost.id";
+
+// Sanitize endpoint provided by environment variable
+if (endpoint) {
+  endpoint = endpoint.replace(/['"\s]+/g, '');
+  if (!endpoint.startsWith('http')) {
+    endpoint = `https://${endpoint}`;
+  }
+}
+
 console.log("S3 Config - Using endpoint:", endpoint);
 
 const s3 = new AWS.S3({
   endpoint: endpoint,
-  s3BucketEndpoint: true,
+  s3BucketEndpoint: false,
   s3ForcePathStyle: true,
   signatureVersion: "v4",
 });
