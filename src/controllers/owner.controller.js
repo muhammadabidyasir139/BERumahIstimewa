@@ -4,23 +4,27 @@ const db = require("../config/db");
 exports.addVilla = async (req, res) => {
   const { name, location, price, description } = req.body;
   const ownerId = req.user.id;
+  const userRole = req.user.role;
   const files = req.files || []; // array file
 
   if (!name || !location || !price) {
     return res.status(400).json({ message: "Data villa tidak lengkap" });
   }
 
+  // If role is admin, set status to 'approved', else 'pending'
+  const status = userRole === "admin" ? "approved" : "pending";
+
   try {
     const villaQuery = `
       INSERT INTO villas (ownerId, name, location, price, description, status)
-      VALUES ($1, $2, $3, $4, $5, 'pending')
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
 
     const villaResult = await new Promise((resolve, reject) => {
       db.query(
         villaQuery,
-        [ownerId, name, location, price, description],
+        [ownerId, name, location, price, description, status],
         (err, result) => {
           if (err) reject(err);
           else resolve(result);
