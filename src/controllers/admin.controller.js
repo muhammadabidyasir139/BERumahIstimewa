@@ -3,7 +3,7 @@ const db = require("../config/db");
 // GET ALL VILLAS
 exports.getAllVillas = (req, res) => {
   const query = `
-    SELECT v.*, GROUP_CONCAT(vp.fileName) AS photos
+    SELECT v.*, string_agg(vp.fileName, ',') AS photos
     FROM villas v
     LEFT JOIN villa_photos vp ON vp.villaId = v.id
     GROUP BY v.id
@@ -14,7 +14,7 @@ exports.getAllVillas = (req, res) => {
     if (err)
       return res.status(500).json({ message: "Gagal mengambil data villa" });
 
-    const data = result.map((row) => {
+    const data = result.rows.map((row) => {
       let photos = [];
       if (row.photos) {
         photos = row.photos.split(",").map((file) => `/uploads/${file}`);
@@ -29,7 +29,7 @@ exports.getAllVillas = (req, res) => {
   });
 };
 
-exports.createVillaByAdmin = (req, res) => {
+exports.createVillaByAdmin = async (req, res) => {
   const { ownerId, name, location, price, description } = req.body;
   const files = req.files || [];
 
@@ -39,50 +39,44 @@ exports.createVillaByAdmin = (req, res) => {
 
   const query = `
     INSERT INTO villas (ownerId, name, location, price, description, status)
-    VALUES (?, ?, ?, ?, ?, 'approved')
+    VALUES ($1, $2, $3, $4, $5, 'approved')
+    RETURNING id
   `;
 
-  db.query(
-    query,
-    [ownerId, name, location, price, description],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).json({ message: "Gagal membuat villa" });
-      }
+  try {
+    const result = await db.query(query, [ownerId, name, location, price, description]);
+    const villaId = result.rows[0].id;
 
-      const villaId = result.insertId;
-
-      if (files.length === 0) {
-        return res.status(201).json({
-          message: "Villa berhasil dibuat oleh admin (tanpa foto)",
-          villaId,
-          photos: [],
-        });
-      }
-
-      const photoValues = files.map((file) => [villaId, file.filename]);
-      const photoQuery =
-        "INSERT INTO villa_photos (villaId, fileName) VALUES ?";
-
-      db.query(photoQuery, [photoValues], (err2) => {
-        if (err2) {
-          console.log(err2);
-          return res.status(500).json({
-            message: "Villa tersimpan tetapi gagal menyimpan foto",
-          });
-        }
-
-        const photoUrls = files.map((f) => `/uploads/${f.filename}`);
-
-        res.status(201).json({
-          message: "Villa berhasil dibuat oleh admin",
-          villaId,
-          photos: photoUrls,
-        });
+    if (files.length === 0) {
+      return res.status(201).json({
+        message: "Villa berhasil dibuat oleh admin (tanpa foto)",
+        villaId,
+        photos: [],
       });
     }
-  );
+
+    // Insert photos using individual queries (Promise.all) for compatibility/simplicity
+    const photoPromises = files.map((file) => {
+      return db.query(
+        "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
+        [villaId, file.filename]
+      );
+    });
+
+    await Promise.all(photoPromises);
+
+    const photoUrls = files.map((f) => `/uploads/${f.filename}`);
+
+    res.status(201).json({
+      message: "Villa berhasil dibuat oleh admin",
+      villaId,
+      photos: photoUrls,
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Gagal membuat villa" });
+  }
 };
 
 // APPROVE VILLA
@@ -90,12 +84,12 @@ exports.approveVilla = (req, res) => {
   const { id } = req.params;
 
   db.query(
-    "UPDATE villas SET status = 'approved' WHERE id = ?",
+    "UPDATE villas SET status = 'approved' WHERE id = $1",
     [id],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Gagal approve villa" });
 
-      if (result.affectedRows === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ message: "Villa tidak ditemukan" });
       }
 
@@ -109,12 +103,12 @@ exports.rejectVilla = (req, res) => {
   const { id } = req.params;
 
   db.query(
-    "UPDATE villas SET status = 'rejected' WHERE id = ?",
+    "UPDATE villas SET status = 'rejected' WHERE id = $1",
     [id],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Gagal reject villa" });
 
-      if (result.affectedRows === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ message: "Villa tidak ditemukan" });
       }
 
@@ -128,13 +122,13 @@ exports.inactiveVilla = (req, res) => {
   const { id } = req.params;
 
   db.query(
-    "UPDATE villas SET status = 'inactive' WHERE id = ?",
+    "UPDATE villas SET status = 'inactive' WHERE id = $1",
     [id],
     (err, result) => {
       if (err)
         return res.status(500).json({ message: "Gagal mengubah status villa" });
 
-      if (result.affectedRows === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ message: "Villa tidak ditemukan" });
       }
 
@@ -147,10 +141,10 @@ exports.inactiveVilla = (req, res) => {
 exports.deleteVilla = (req, res) => {
   const { id } = req.params;
 
-  db.query("DELETE FROM villas WHERE id = ?", [id], (err, result) => {
+  db.query("DELETE FROM villas WHERE id = $1", [id], (err, result) => {
     if (err) return res.status(500).json({ message: "Gagal menghapus villa" });
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ message: "Villa tidak ditemukan" });
     }
 
@@ -160,10 +154,10 @@ exports.deleteVilla = (req, res) => {
 
 // GET ALL USERS
 exports.getAllUsers = (req, res) => {
-  db.query("SELECT id, name, email, role, status FROM users", (err, users) => {
+  db.query("SELECT id, name, email, role, status FROM users", (err, result) => {
     if (err) return res.status(500).json({ message: "Gagal mengambil user" });
 
-    res.json(users);
+    res.json(result.rows);
   });
 };
 
@@ -177,13 +171,13 @@ exports.updateUserStatus = (req, res) => {
   }
 
   db.query(
-    "UPDATE users SET status = ? WHERE id = ?",
+    "UPDATE users SET status = $1 WHERE id = $2",
     [status, id],
     (err, result) => {
       if (err)
         return res.status(500).json({ message: "Gagal update status user" });
 
-      if (result.affectedRows === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ message: "User tidak ditemukan" });
       }
 
@@ -197,15 +191,14 @@ exports.getRevenue = (req, res) => {
   const { period } = req.query; // 'day', 'week', 'month' or undefined for all time
 
   let dateFilter = "";
-  let params = [];
-
+  // Note: Standard postgres date functions
   if (period === "day") {
-    dateFilter = "AND DATE(p.transactionTime) = CURDATE()";
+    dateFilter = "AND DATE(p.transactionTime) = CURRENT_DATE";
   } else if (period === "week") {
-    dateFilter = "AND YEARWEEK(p.transactionTime, 1) = YEARWEEK(CURDATE(), 1)";
+    // Basic approximation across DBs, but for PG:
+    dateFilter = "AND p.transactionTime >= date_trunc('week', CURRENT_DATE)";
   } else if (period === "month") {
-    dateFilter =
-      "AND YEAR(p.transactionTime) = YEAR(CURDATE()) AND MONTH(p.transactionTime) = MONTH(CURDATE())";
+    dateFilter = "AND p.transactionTime >= date_trunc('month', CURRENT_DATE)";
   }
 
   const query = `
@@ -219,22 +212,22 @@ exports.getRevenue = (req, res) => {
     WHERE p.transactionStatus = 'paid' ${dateFilter}
   `;
 
-  db.query(query, params, (err, result) => {
+  db.query(query, [], (err, result) => {
     if (err) {
       console.log(err);
       return res.status(500).json({ message: "Gagal mengambil data revenue" });
     }
 
-    const revenueData = result[0];
+    const revenueData = result.rows[0];
     res.json({
       message: "Data revenue berhasil diambil",
       period: period || "all",
       data: {
-        totalTransactions: parseInt(revenueData.totalTransactions) || 0,
-        totalRevenue: parseFloat(revenueData.totalRevenue) || 0,
-        averageTransaction: parseFloat(revenueData.averageTransaction) || 0,
-        firstTransaction: revenueData.firstTransaction,
-        lastTransaction: revenueData.lastTransaction,
+        totalTransactions: parseInt(revenueData.totaltransactions) || 0, // PG downcases column aliases typically
+        totalRevenue: parseFloat(revenueData.totalrevenue) || 0,
+        averageTransaction: parseFloat(revenueData.averagetransaction) || 0,
+        firstTransaction: revenueData.firsttransaction,
+        lastTransaction: revenueData.lasttransaction,
       },
     });
   });
@@ -247,19 +240,20 @@ exports.getAllTransactions = (req, res) => {
 
   let whereClause = "";
   let params = [];
+  let paramCount = 1;
 
   if (status) {
-    whereClause += " AND p.transactionStatus = ?";
+    whereClause += ` AND p.transactionStatus = $${paramCount++}`;
     params.push(status);
   }
 
   if (startDate) {
-    whereClause += " AND DATE(p.transactionTime) >= ?";
+    whereClause += ` AND DATE(p.transactionTime) >= $${paramCount++}`;
     params.push(startDate);
   }
 
   if (endDate) {
-    whereClause += " AND DATE(p.transactionTime) <= ?";
+    whereClause += ` AND DATE(p.transactionTime) <= $${paramCount++}`;
     params.push(endDate);
   }
 
@@ -296,12 +290,15 @@ exports.getAllTransactions = (req, res) => {
     JOIN users u ON b.userId = u.id
     WHERE 1=1 ${whereClause}
     ORDER BY p.transactionTime DESC
-    LIMIT ? OFFSET ?
+    LIMIT $${paramCount++} OFFSET $${paramCount++}
   `;
+
+  // Clone params for count query avoiding limit/offset
+  const countParams = [...params];
 
   params.push(parseInt(limit), parseInt(offset));
 
-  db.query(countQuery, params.slice(0, -2), (err, countResult) => {
+  db.query(countQuery, countParams, (err, countResult) => {
     if (err) {
       console.log(err);
       return res
@@ -309,9 +306,9 @@ exports.getAllTransactions = (req, res) => {
         .json({ message: "Gagal mengambil jumlah transaksi" });
     }
 
-    const total = countResult[0].total;
+    const total = parseInt(countResult.rows[0].total);
 
-    db.query(dataQuery, params, (err, transactions) => {
+    db.query(dataQuery, params, (err, result) => {
       if (err) {
         console.log(err);
         return res
@@ -327,7 +324,7 @@ exports.getAllTransactions = (req, res) => {
           total,
           totalPages: Math.ceil(total / limit),
         },
-        transactions,
+        transactions: result.rows,
       });
     });
   });

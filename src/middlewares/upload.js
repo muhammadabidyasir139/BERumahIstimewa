@@ -14,6 +14,9 @@ const storage = multerS3({
   s3: s3,
   bucket: bucketName || "rumahistimewa", // fallback to hardcoded bucket name
   acl: "public-read", // agar bisa diakses publik
+  contentType: (req, file, cb) => {
+    cb(null, "image/jpeg");
+  },
   metadata: (req, file, cb) => {
     cb(null, { fieldName: file.fieldname });
   },
