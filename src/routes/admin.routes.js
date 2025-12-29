@@ -6,6 +6,7 @@ const upload = require("../middlewares/upload");
 const {
   getAllVillas,
   createVillaByAdmin,
+  editVilla,
   approveVilla,
   rejectVilla,
   inactiveVilla,
@@ -31,6 +32,13 @@ router.post(
   adminOnly,
   upload.array("photos", 10),
   createVillaByAdmin
+);
+router.put(
+  "/villas/:id",
+  verifyJWT,
+  adminOnly,
+  upload.array("photos", 10),
+  editVilla
 );
 router.get("/villas", verifyJWT, adminOnly, getAllVillas);
 router.put("/villas/:id/approve", verifyJWT, adminOnly, approveVilla);

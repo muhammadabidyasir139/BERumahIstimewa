@@ -79,6 +79,64 @@ exports.createVillaByAdmin = async (req, res) => {
   }
 };
 
+// EDIT VILLA
+exports.editVilla = async (req, res) => {
+  const { id } = req.params;
+  const { name, location, price, description } = req.body;
+  const files = req.files || [];
+
+  if (!name || !location || !price) {
+    return res.status(400).json({ message: "Data villa tidak lengkap" });
+  }
+
+  const query = `
+    UPDATE villas 
+    SET name = $1, location = $2, price = $3, description = $4
+    WHERE id = $5
+    RETURNING *
+  `;
+
+  try {
+    const result = await db.query(query, [name, location, price, description, id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Villa tidak ditemukan" });
+    }
+
+    // If there are new photos, insert them
+    if (files.length > 0) {
+      const photoPromises = files.map((file) => {
+        return db.query(
+          "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
+          [id, file.filename]
+        );
+      });
+      await Promise.all(photoPromises);
+    }
+
+    const updatedVilla = result.rows[0];
+
+    // Get updated photos list
+    const photosResult = await db.query(
+      "SELECT fileName FROM villa_photos WHERE villaId = $1",
+      [id]
+    );
+    const photos = photosResult.rows.map(row => `/uploads/${row.filename}`);
+
+    res.json({
+      message: "Villa berhasil diupdate",
+      villa: {
+        ...updatedVilla,
+        photos
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Gagal mengupdate villa" });
+  }
+};
+
 // APPROVE VILLA
 exports.approveVilla = (req, res) => {
   const { id } = req.params;
