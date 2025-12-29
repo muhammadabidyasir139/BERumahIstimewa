@@ -1,4 +1,10 @@
 const db = require("../config/db");
+const { s3, bucketName } = require("../config/s3");
+
+// Helper for S3 URL
+const getS3Url = (filename) => {
+  return `${s3.endpoint.href}${bucketName}/${filename}`;
+};
 
 // GET ALL VILLAS
 exports.getAllVillas = (req, res) => {
@@ -17,7 +23,7 @@ exports.getAllVillas = (req, res) => {
     const data = result.rows.map((row) => {
       let photos = [];
       if (row.photos) {
-        photos = row.photos.split(",").map((file) => `/uploads/${file}`);
+        photos = row.photos.split(",").map((file) => getS3Url(file));
       }
       return {
         ...row,
@@ -57,15 +63,17 @@ exports.createVillaByAdmin = async (req, res) => {
 
     // Insert photos using individual queries (Promise.all) for compatibility/simplicity
     const photoPromises = files.map((file) => {
+      // Use file.key for S3 (provided by multer-s3), fallback to filename if local
+      const key = file.key || file.filename;
       return db.query(
         "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
-        [villaId, file.filename]
+        [villaId, key]
       );
     });
 
     await Promise.all(photoPromises);
 
-    const photoUrls = files.map((f) => `/uploads/${f.filename}`);
+    const photoUrls = files.map((f) => getS3Url(f.key || f.filename));
 
     res.status(201).json({
       message: "Villa berhasil dibuat oleh admin",
@@ -106,9 +114,10 @@ exports.editVilla = async (req, res) => {
     // If there are new photos, insert them
     if (files.length > 0) {
       const photoPromises = files.map((file) => {
+        const key = file.key || file.filename;
         return db.query(
           "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
-          [id, file.filename]
+          [id, key]
         );
       });
       await Promise.all(photoPromises);
@@ -121,7 +130,7 @@ exports.editVilla = async (req, res) => {
       "SELECT fileName FROM villa_photos WHERE villaId = $1",
       [id]
     );
-    const photos = photosResult.rows.map(row => `/uploads/${row.filename}`);
+    const photos = photosResult.rows.map(row => getS3Url(row.filename));
 
     res.json({
       message: "Villa berhasil diupdate",
