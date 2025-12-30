@@ -50,4 +50,7 @@ router.delete("/villas/:id", verifyJWT, adminOnly, deleteVilla);
 router.get("/users", verifyJWT, adminOnly, getAllUsers);
 router.put("/users/:id/status", verifyJWT, adminOnly, updateUserStatus);
 
+// Transaction Management
+router.get("/transactions", verifyJWT, adminOnly, getAllTransactions);
+
 module.exports = router;
