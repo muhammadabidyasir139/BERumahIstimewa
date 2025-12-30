@@ -1,4 +1,10 @@
 const db = require("../config/db");
+const { s3, bucketName } = require("../config/s3");
+
+// Helper for S3 URL
+const getS3Url = (filename) => {
+  return `${s3.endpoint.href}${bucketName}/${filename}`;
+};
 
 // GET ALL VILLAS (Customer – hanya approved)
 exports.getAllVillas = (req, res) => {
@@ -60,7 +66,7 @@ exports.getAllVillas = (req, res) => {
     const data = result.rows.map((row) => {
       let photos = [];
       if (row.photos) {
-        photos = row.photos.split(",");
+        photos = row.photos.split(",").map((file) => getS3Url(file));
       }
       return {
         ...row,
@@ -97,7 +103,7 @@ exports.getVillaById = (req, res) => {
     const row = result.rows[0];
     let photos = [];
     if (row.photos) {
-      photos = row.photos.split(",");
+      photos = row.photos.split(",").map((file) => getS3Url(file));
     }
 
     res.json({
