@@ -53,7 +53,7 @@ exports.addToWishlist = (req, res) => {
 // Remove from wishlist
 exports.removeFromWishlist = (req, res) => {
   const userId = req.user.id;
-  const { villaid } = req.body;
+  const villaid = req.params.id;
 
   if (!villaid) {
     return res.status(400).json({ message: "Villa ID wajib diisi" });

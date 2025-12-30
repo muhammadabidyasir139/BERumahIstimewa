@@ -15,6 +15,6 @@ router.post("/", verifyJWT, addToWishlist);
 router.get("/my", verifyJWT, getMyWishlist);
 
 // Remove from wishlist
-router.delete("/", verifyJWT, removeFromWishlist);
+router.delete("/:id", verifyJWT, removeFromWishlist);
 
 module.exports = router;
