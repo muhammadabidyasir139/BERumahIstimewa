@@ -295,7 +295,7 @@ exports.getOwnerIncome = (req, res) => {
     JOIN bookings b ON p.bookingId = b.id
     JOIN villas v ON b.villaId = v.id
     WHERE v.ownerId = $1
-    AND p.transactionStatus IN ('settlement', 'capture')
+    AND p.transactionstatus IN ('settlement', 'capture')
   `;
 
   db.query(query, [ownerId], (err, result) => {

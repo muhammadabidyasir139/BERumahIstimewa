@@ -32,8 +32,8 @@ exports.midtransNotification = (req, res) => {
     UPDATE payments
     SET transactionId = $1,
         paymentType = $2,
-        transactionStatus = $3,
-        transactionTime = $4,
+        transactionstatus = $3,
+        transactiontime = $4,
         rawResponse = $5
     WHERE orderId = $6
   `;

@@ -284,20 +284,20 @@ exports.getRevenue = (req, res) => {
   // We use IN clause directly in query string for simplicity or parameterized if needed,
   // but since these are constant strings it's safe to hardcode the condition.
   // The original code used 'paid' which might not match Midtrans statuses directly.
-  const statusCondition = "p.transactionStatus IN ('settlement', 'capture')";
+  const statusCondition = "p.transactionstatus IN ('settlement', 'capture')";
 
   if (startDate && endDate) {
     // Custom range
-    dateFilter = `AND DATE(p.transactionTime) >= $${paramCount++} AND DATE(p.transactionTime) <= $${paramCount++}`;
+    dateFilter = `AND p.transactiontime::DATE >= $${paramCount++} AND p.transactiontime::DATE <= $${paramCount++}`;
     params.push(startDate, endDate);
   } else if (period === "day") {
-    dateFilter = "AND DATE(p.transactionTime) = CURRENT_DATE";
+    dateFilter = "AND p.transactiontime::DATE = CURRENT_DATE";
   } else if (period === "week") {
     // Current week (starting monday usually, or just last 7 days?)
     // date_trunc('week', ...) in Postgres starts on Monday by default
-    dateFilter = "AND p.transactionTime >= date_trunc('week', CURRENT_DATE)";
+    dateFilter = "AND p.transactiontime >= date_trunc('week', CURRENT_DATE)";
   } else if (period === "month") {
-    dateFilter = "AND p.transactionTime >= date_trunc('month', CURRENT_DATE)";
+    dateFilter = "AND p.transactiontime >= date_trunc('month', CURRENT_DATE)";
   }
 
   const query = `
@@ -305,8 +305,8 @@ exports.getRevenue = (req, res) => {
       COUNT(*) as totalTransactions,
       SUM(p.grossAmount) as totalRevenue,
       AVG(p.grossAmount) as averageTransaction,
-      MIN(p.transactionTime) as firstTransaction,
-      MAX(p.transactionTime) as lastTransaction
+      MIN(p.transactiontime) as firstTransaction,
+      MAX(p.transactiontime) as lastTransaction
     FROM payments p
     WHERE ${statusCondition} ${dateFilter}
   `;
@@ -342,17 +342,17 @@ exports.getAllTransactions = (req, res) => {
   let paramCount = 1;
 
   if (status) {
-    whereClause += ` AND p.transactionStatus = $${paramCount++}`;
+    whereClause += ` AND p.transactionstatus = $${paramCount++}`;
     params.push(status);
   }
 
   if (startDate) {
-    whereClause += ` AND DATE(p.transactionTime) >= $${paramCount++}`;
+    whereClause += ` AND p.transactiontime::DATE >= $${paramCount++}`;
     params.push(startDate);
   }
 
   if (endDate) {
-    whereClause += ` AND DATE(p.transactionTime) <= $${paramCount++}`;
+    whereClause += ` AND p.transactiontime::DATE <= $${paramCount++}`;
     params.push(endDate);
   }
 
@@ -360,7 +360,7 @@ exports.getAllTransactions = (req, res) => {
   const statsQuery = `
     SELECT 
       COUNT(*) as total,
-      COALESCE(SUM(CASE WHEN p.transactionStatus IN ('settlement', 'capture') THEN p.grossAmount ELSE 0 END), 0) as totalRevenue
+      COALESCE(SUM(CASE WHEN p.transactionstatus IN ('settlement', 'capture') THEN p.grossAmount ELSE 0 END), 0) as totalRevenue
     FROM payments p
     JOIN bookings b ON p.bookingId = b.id
     JOIN villas v ON b.villaId = v.id
@@ -374,8 +374,8 @@ exports.getAllTransactions = (req, res) => {
       p.orderId,
       p.transactionId,
       p.paymentType,
-      p.transactionStatus,
-      p.transactionTime,
+      p.transactionstatus,
+      p.transactiontime,
       p.grossAmount,
       b.checkIn,
       b.checkOut,
@@ -388,7 +388,7 @@ exports.getAllTransactions = (req, res) => {
     JOIN villas v ON b.villaId = v.id
     JOIN users u ON b.userId = u.id
     WHERE 1=1 ${whereClause}
-    ORDER BY p.transactionTime DESC
+    ORDER BY p.transactiontime DESC
     LIMIT $${paramCount++} OFFSET $${paramCount++}
   `;
 
