@@ -17,7 +17,6 @@ const {
   getAllTransactions,
 } = require("../controllers/admin.controller");
 
-// Middleware untuk admin only
 function adminOnly(req, res, next) {
   if (req.user.role !== "admin") {
     return res.status(403).json({ message: "Akses hanya untuk admin" });
@@ -25,7 +24,6 @@ function adminOnly(req, res, next) {
   next();
 }
 
-// Villa Management
 router.post(
   "/villas",
   verifyJWT,
@@ -46,11 +44,9 @@ router.put("/villas/:id/reject", verifyJWT, adminOnly, rejectVilla);
 router.put("/villas/:id/inactive", verifyJWT, adminOnly, inactiveVilla);
 router.delete("/villas/:id", verifyJWT, adminOnly, deleteVilla);
 
-// User Management
 router.get("/users", verifyJWT, adminOnly, getAllUsers);
 router.put("/users/:id/status", verifyJWT, adminOnly, updateUserStatus);
 
-// Transaction Management
 router.get("/transactions", verifyJWT, adminOnly, getAllTransactions);
 router.get("/revenue", verifyJWT, adminOnly, getRevenue);
 

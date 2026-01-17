@@ -1,23 +1,20 @@
 const db = require("../config/db");
 const { s3, bucketName } = require("../config/s3");
 
-// Helper for S3 URL
 const getS3Url = (filename) => {
   return `${s3.endpoint.href}${bucketName}/${filename}`;
 };
 
-// CREATE VILLA (dengan multiple foto)
 exports.addVilla = async (req, res) => {
   const { name, location, price, description } = req.body;
   const ownerId = req.user.id;
   const userRole = req.user.role;
-  const files = req.files || []; // array file
+  const files = req.files || [];
 
   if (!name || !location || !price) {
     return res.status(400).json({ message: "Data villa tidak lengkap" });
   }
 
-  // If role is admin, set status to 'approved', else 'pending'
   const status = userRole === "admin" ? "approved" : "pending";
 
   try {
@@ -48,10 +45,8 @@ exports.addVilla = async (req, res) => {
       });
     }
 
-    // simpan semua foto ke tabel villa_photos
     const photoPromises = files.map((file) => {
       return new Promise((resolve, reject) => {
-        // Use file.key (S3) or fallback to filename if local
         const key = file.key || file.filename;
         db.query(
           "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
@@ -66,9 +61,8 @@ exports.addVilla = async (req, res) => {
 
     await Promise.all(photoPromises);
 
-    // Use file.location if available (S3), otherwise construct URL
-    const photoUrls = files.map((f) =>
-      f.location || getS3Url(f.key || f.filename)
+    const photoUrls = files.map(
+      (f) => f.location || getS3Url(f.key || f.filename)
     );
 
     res.status(201).json({
@@ -82,7 +76,6 @@ exports.addVilla = async (req, res) => {
   }
 };
 
-// GET OWNER VILLAS
 exports.getOwnerVillas = (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
@@ -91,7 +84,6 @@ exports.getOwnerVillas = (req, res) => {
   let params;
 
   if (userRole === "admin") {
-    // Admin can see all villas
     query = `
       SELECT v.*, string_agg(vp.fileName, ',') AS photos
       FROM villas v
@@ -101,7 +93,6 @@ exports.getOwnerVillas = (req, res) => {
     `;
     params = [];
   } else {
-    // Owner/customer can only see their own villas
     query = `
       SELECT v.*, string_agg(vp.fileName, ',') AS photos
       FROM villas v
@@ -119,7 +110,6 @@ exports.getOwnerVillas = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data villa" });
     }
 
-    // ubah string "f1.jpg,f2.jpg" -> array URL
     const data = result.rows.map((row) => {
       let photos = [];
       if (row.photos) {
@@ -141,9 +131,7 @@ exports.updateVilla = (req, res) => {
   const userRole = req.user.role;
   const updatedData = req.body;
 
-  // Build the check query based on role
   let checkQuery;
-  let checkParams;
 
   if (userRole === "admin") {
     checkQuery = "SELECT status FROM villas WHERE id = $1";
@@ -163,7 +151,6 @@ exports.updateVilla = (req, res) => {
 
     const status = result.rows[0].status;
 
-    // Tidak boleh edit approved atau inactive
     if (status === "approved" || status === "inactive") {
       return res.status(403).json({
         message:
@@ -171,14 +158,10 @@ exports.updateVilla = (req, res) => {
       });
     }
 
-    // Jika villa REJECTED → ubah status kembali ke pending
     if (status === "rejected") {
       updatedData.status = "pending";
     }
 
-    // Handle partial updates for Postgres
-    // Note: '?' syntax was simple for object update in MySQL driver, but pg driver doesn't support "SET ?"
-    // We need to construct the query dynamically
     const fields = Object.keys(updatedData);
     const values = Object.values(updatedData);
 
@@ -186,15 +169,21 @@ exports.updateVilla = (req, res) => {
       return res.status(400).json({ message: "Tidak ada data yang diupdate" });
     }
 
-    let setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(", ");
+    let setClause = fields
+      .map((field, index) => `${field} = $${index + 1}`)
+      .join(", ");
     let updateQuery;
     let updateParams = [...values];
 
     if (userRole === "admin") {
-      updateQuery = `UPDATE villas SET ${setClause} WHERE id = $${values.length + 1}`;
+      updateQuery = `UPDATE villas SET ${setClause} WHERE id = $${
+        values.length + 1
+      }`;
       updateParams.push(id);
     } else {
-      updateQuery = `UPDATE villas SET ${setClause} WHERE id = $${values.length + 1} AND ownerId = $${values.length + 2}`;
+      updateQuery = `UPDATE villas SET ${setClause} WHERE id = $${
+        values.length + 1
+      } AND ownerId = $${values.length + 2}`;
       updateParams.push(id, userId);
     }
 
@@ -214,7 +203,6 @@ exports.deleteVilla = (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
 
-  // Build the check query based on role
   let checkQuery;
   let checkParams;
 
@@ -236,7 +224,6 @@ exports.deleteVilla = (req, res) => {
 
     const status = result.rows[0].status;
 
-    // Tidak boleh delete jika approved/inactive
     if (status === "approved" || status === "inactive") {
       return res.status(403).json({
         message:
@@ -264,7 +251,6 @@ exports.deleteVilla = (req, res) => {
   });
 };
 
-// GET OWNER BOOKINGS
 exports.getOwnerBookings = (req, res) => {
   const ownerId = req.user.id;
 
@@ -283,7 +269,6 @@ exports.getOwnerBookings = (req, res) => {
   });
 };
 
-// GET OWNER INCOME
 exports.getOwnerIncome = (req, res) => {
   const ownerId = req.user.id;
 
@@ -301,14 +286,16 @@ exports.getOwnerIncome = (req, res) => {
   db.query(query, [ownerId], (err, result) => {
     if (err) {
       console.log(err);
-      return res.status(500).json({ message: "Gagal mengambil data pendapatan" });
+      return res
+        .status(500)
+        .json({ message: "Gagal mengambil data pendapatan" });
     }
 
     const data = result.rows[0];
     res.json({
       message: "Data pendapatan berhasil diambil",
       totalIncome: parseFloat(data.totalincome),
-      totalTransactions: parseInt(data.totaltransactions)
+      totalTransactions: parseInt(data.totaltransactions),
     });
   });
 };

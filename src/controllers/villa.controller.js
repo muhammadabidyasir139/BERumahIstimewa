@@ -1,12 +1,10 @@
 const db = require("../config/db");
 const { s3, bucketName } = require("../config/s3");
 
-// Helper for S3 URL
 const getS3Url = (filename) => {
   return `${s3.endpoint.href}${bucketName}/${filename}`;
 };
 
-// GET ALL VILLAS (Customer – hanya approved)
 exports.getAllVillas = (req, res) => {
   const { name, location, sort, min_price, max_price } = req.query;
 
@@ -48,7 +46,6 @@ exports.getAllVillas = (req, res) => {
     GROUP BY v.id
   `;
 
-  // Handle sorting
   if (sort === "price_asc") {
     query += ` ORDER BY v.price ASC`;
   } else if (sort === "price_desc") {
@@ -78,7 +75,6 @@ exports.getAllVillas = (req, res) => {
   });
 };
 
-// GET VILLA DETAIL
 exports.getVillaById = (req, res) => {
   const { id } = req.params;
 

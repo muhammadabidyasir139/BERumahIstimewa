@@ -15,7 +15,6 @@ exports.midtransNotification = (req, res) => {
     transaction_time,
   } = body;
 
-  // 1. Verifikasi signature
   const serverKey = process.env.MIDTRANS_SERVER_KEY;
   const checkSignature = crypto
     .createHash("sha512")
@@ -27,7 +26,6 @@ exports.midtransNotification = (req, res) => {
     return res.status(403).json({ message: "Invalid signature" });
   }
 
-  // 2. Update tabel payments
   const updatePaymentQuery = `
     UPDATE payments
     SET transactionId = $1,
@@ -51,12 +49,10 @@ exports.midtransNotification = (req, res) => {
     (err, result) => {
       if (err) {
         console.log("Gagal update payment:", err);
-        // tetap balas 200 agar Midtrans tidak spam retry
       }
     }
   );
 
-  // 3. Dapatkan bookingId dari tabel payments
   const getPaymentQuery = "SELECT bookingId FROM payments WHERE orderId = $1";
 
   db.query(getPaymentQuery, [order_id], (err, result) => {
@@ -79,7 +75,6 @@ exports.midtransNotification = (req, res) => {
       transaction_status
     );
 
-    // 4. Tentukan status booking berdasarkan transaction_status
     let newStatus = "waiting_payment";
     if (
       transaction_status === "capture" ||
@@ -108,7 +103,6 @@ exports.midtransNotification = (req, res) => {
         );
       }
 
-      // Midtrans hanya butuh response 200 OK
       return res.json({ message: "OK" });
     });
   });

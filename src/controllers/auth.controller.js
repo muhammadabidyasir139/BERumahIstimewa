@@ -2,7 +2,6 @@ const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// REGISTER
 exports.register = (req, res) => {
   const { name, email, password, role } = req.body;
 
@@ -10,7 +9,6 @@ exports.register = (req, res) => {
     return res.status(400).json({ message: "Harap isi semua field" });
   }
 
-  // Cek email sudah terdaftar
   db.query("SELECT * FROM users WHERE email = $1", [email], (err, result) => {
     if (err) {
       console.log(err);
@@ -20,7 +18,6 @@ exports.register = (req, res) => {
       return res.status(400).json({ message: "Email sudah terdaftar" });
     }
 
-    // Hash password
     bcrypt.hash(password, 10, (err, hashedPassword) => {
       if (err) {
         console.log(err);
@@ -50,7 +47,6 @@ exports.register = (req, res) => {
   });
 };
 
-// LOGIN
 exports.login = (req, res) => {
   const { email, password } = req.body;
 
@@ -64,8 +60,6 @@ exports.login = (req, res) => {
     }
 
     const user = result.rows[0];
-
-    // Cek password
     bcrypt.compare(password, user.password, (err, passwordMatch) => {
       if (err) {
         console.log(err);
@@ -75,8 +69,6 @@ exports.login = (req, res) => {
       if (!passwordMatch) {
         return res.status(400).json({ message: "Password salah" });
       }
-
-      // Buat token JWT
       const token = jwt.sign(
         { id: user.id, role: user.role },
         process.env.JWT_SECRET,

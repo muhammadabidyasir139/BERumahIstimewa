@@ -14,12 +14,11 @@ const {
   getOwnerIncome,
 } = require("../controllers/owner.controller");
 
-// Villas CRUD for customers
 router.post(
   "/villas",
   verifyJWT,
   verifyCustomer,
-  upload.array("photos", 10), // max 10 file per request, bisa kamu naikkan
+  upload.array("photos", 10),
   addVilla
 );
 router.get("/villas", verifyJWT, verifyCustomer, getOwnerVillas);

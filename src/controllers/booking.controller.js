@@ -2,18 +2,10 @@ const db = require("../config/db");
 const snap = require("../config/midtrans");
 const { s3, bucketName } = require("../config/s3");
 
-// Helper for S3 URL
 const getS3Url = (filename) => {
   return `${s3.endpoint.href}${bucketName}/${filename}`;
 };
 
-// ... (keep countNights and checkAvailability specific code if re-writing file, but I will use replace_file_content for just the needed parts if possible.
-// Wait, REPLACE_FILE_CONTENT replaces a block. I need to make sure I don't lose the top imports if I don't select them.
-// I'll start the replacement at line 1 to add the import.
-
-// ... createBooking ...
-
-// GET MY BOOKINGS
 exports.getMyBookings = (req, res) => {
   const userId = req.user.id;
 
@@ -57,18 +49,14 @@ exports.getMyBookings = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data booking" });
     }
 
-    // Transform the result
     const bookings = result.rows.map((row) => {
-      // Logic status: if payment settlement/capture -> paid
       let status = row.booking_status;
       if (
         row.transactionstatus === "settlement" ||
         row.transactionstatus === "capture"
       ) {
         status = "paid";
-      } else if (
-        row.transactionstatus === "pending"
-      ) {
+      } else if (row.transactionstatus === "pending") {
         status = "waiting_payment";
       } else if (
         row.transactionstatus === "expire" ||
@@ -78,7 +66,6 @@ exports.getMyBookings = (req, res) => {
         status = "cancelled";
       }
 
-      // Construct photo URL
       let photoUrl = null;
       if (row.villa_photo) {
         photoUrl = getS3Url(row.villa_photo);
@@ -123,12 +110,11 @@ exports.getMyBookings = (req, res) => {
 function countNights(checkIn, checkOut) {
   const start = new Date(checkIn);
   const end = new Date(checkOut);
-  const diffTime = end - start; // ms
+  const diffTime = end - start;
   const nights = diffTime / (1000 * 60 * 60 * 24);
   return nights;
 }
 
-// CHECK AVAILABILITY FUNCTION (sama seperti sebelumnya)
 function checkAvailability(villaId, checkIn, checkOut) {
   return new Promise((resolve, reject) => {
     const query = `
@@ -151,17 +137,15 @@ function checkAvailability(villaId, checkIn, checkOut) {
   });
 }
 
-// CREATE BOOKING + MIDTRANS SNAP
 exports.createBooking = async (req, res) => {
   try {
     const { villaId, checkIn, checkOut } = req.body;
-    const userId = req.user.id; // dari JWT
+    const userId = req.user.id;
 
     if (!villaId || !checkIn || !checkOut) {
       return res.status(400).json({ message: "Data booking tidak lengkap" });
     }
 
-    // 1. Check availability
     const isAvailable = await checkAvailability(villaId, checkIn, checkOut);
     if (!isAvailable) {
       return res.status(400).json({
@@ -169,7 +153,6 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    // 2. Ambil data villa & harga
     const villaQuery = "SELECT * FROM villas WHERE id = $1";
     const villa = await new Promise((resolve, reject) => {
       db.query(villaQuery, [villaId], (err, result) => {
@@ -180,7 +163,6 @@ exports.createBooking = async (req, res) => {
       });
     });
 
-    // 3. Hitung jumlah malam & totalAmount
     const nights = countNights(checkIn, checkOut);
     if (nights <= 0) {
       return res
@@ -191,7 +173,6 @@ exports.createBooking = async (req, res) => {
     const pricePerNight = villa.price;
     const totalAmount = pricePerNight * nights;
 
-    // 4. Insert booking dengan status waiting_payment
     const insertBookingQuery = `
       INSERT INTO bookings (userId, villaId, checkIn, checkOut, status, totalAmount)
       VALUES ($1, $2, $3, $4, 'waiting_payment', $5)
@@ -209,10 +190,8 @@ exports.createBooking = async (req, res) => {
       );
     });
 
-    // 5. Buat orderId unik untuk Midtrans
     const orderId = `BOOK-${bookingId}-${Date.now()}`;
 
-    // 6. Ambil data user untuk customer_details
     const userQuery = "SELECT name, email FROM users WHERE id = $1";
     const user = await new Promise((resolve, reject) => {
       db.query(userQuery, [userId], (err, result) => {
@@ -223,7 +202,6 @@ exports.createBooking = async (req, res) => {
       });
     });
 
-    // 7. Parameter Midtrans Snap
     const parameter = {
       transaction_details: {
         order_id: orderId,
@@ -243,13 +221,11 @@ exports.createBooking = async (req, res) => {
       },
     };
 
-    // 8. Buat transaksi Snap
     const transaction = await snap.createTransaction(parameter);
 
     const redirectUrl = transaction.redirect_url;
     const token = transaction.token;
 
-    // 9. Simpan record payment (status awal pending)
     const insertPaymentQuery = `
       INSERT INTO payments (bookingId, orderId, grossAmount, transactionStatus, token, redirectUrl, rawResponse)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -274,7 +250,6 @@ exports.createBooking = async (req, res) => {
       );
     });
 
-    // 10. Kirim response ke client
     return res.status(201).json({
       message: "Booking dibuat, silakan lakukan pembayaran",
       bookingId,
@@ -293,7 +268,6 @@ exports.createBooking = async (req, res) => {
   }
 };
 
-// GET MY BOOKINGS (boleh tetap seperti sebelumnya, tapi tambahkan status & totalAmount)
 exports.getMyBookings = (req, res) => {
   const userId = req.user.id;
 
@@ -337,18 +311,14 @@ exports.getMyBookings = (req, res) => {
       return res.status(500).json({ message: "Gagal mengambil data booking" });
     }
 
-    // Transform the result to include payment object with redirectUrl from database column
     const bookings = result.rows.map((row) => {
-      // Logic status: if payment settlement/capture -> paid
       let status = row.booking_status;
       if (
         row.transactionstatus === "settlement" ||
         row.transactionstatus === "capture"
       ) {
         status = "paid";
-      } else if (
-        row.transactionstatus === "pending"
-      ) {
+      } else if (row.transactionstatus === "pending") {
         status = "waiting_payment";
       } else if (
         row.transactionstatus === "expire" ||
@@ -358,7 +328,6 @@ exports.getMyBookings = (req, res) => {
         status = "cancelled";
       }
 
-      // Construct photo URL
       let photoUrl = null;
       if (row.villa_photo) {
         photoUrl = getS3Url(row.villa_photo);
@@ -401,7 +370,6 @@ exports.getMyBookings = (req, res) => {
   });
 };
 
-// GET BOOKING DETAIL
 exports.getBookingById = (req, res) => {
   const userId = req.user.id;
   const bookingId = req.params.id;
@@ -451,7 +419,6 @@ exports.getBookingById = (req, res) => {
 
     const row = result.rows[0];
 
-    // Logic status calculation
     let status = row.booking_status;
     if (
       row.transactionstatus === "settlement" ||
@@ -468,7 +435,6 @@ exports.getBookingById = (req, res) => {
       status = "cancelled";
     }
 
-    // Construct photo URL
     let photoUrl = null;
     if (row.villa_photo) {
       photoUrl = getS3Url(row.villa_photo);

@@ -1,12 +1,10 @@
 const db = require("../config/db");
 const { s3, bucketName } = require("../config/s3");
 
-// Helper for S3 URL
 const getS3Url = (filename) => {
   return `${s3.endpoint.href}${bucketName}/${filename}`;
 };
 
-// Add to wishlist
 exports.addToWishlist = (req, res) => {
   const userId = req.user.id;
   const { villaid } = req.body;
@@ -15,7 +13,6 @@ exports.addToWishlist = (req, res) => {
     return res.status(400).json({ message: "Villa ID wajib diisi" });
   }
 
-  // Check if already in wishlist
   db.query(
     "SELECT * FROM wishlist_villas WHERE userid = $1 AND villaid = $2",
     [userId, villaid],
@@ -29,7 +26,6 @@ exports.addToWishlist = (req, res) => {
         return res.status(400).json({ message: "Villa sudah ada di wishlist" });
       }
 
-      // Add to wishlist
       db.query(
         "INSERT INTO wishlist_villas (userid, villaid, createdat) VALUES ($1, $2, NOW())",
         [userId, villaid],
@@ -50,7 +46,6 @@ exports.addToWishlist = (req, res) => {
   );
 };
 
-// Remove from wishlist
 exports.removeFromWishlist = (req, res) => {
   const userId = req.user.id;
   const villaid = req.params.id;
@@ -59,7 +54,6 @@ exports.removeFromWishlist = (req, res) => {
     return res.status(400).json({ message: "Villa ID wajib diisi" });
   }
 
-  // Remove from wishlist
   db.query(
     "DELETE FROM wishlist_villas WHERE userid = $1 AND villaid = $2",
     [userId, villaid],
@@ -82,7 +76,6 @@ exports.removeFromWishlist = (req, res) => {
   );
 };
 
-// Get My Wishlist
 exports.getMyWishlist = (req, res) => {
   const userId = req.user.id;
 

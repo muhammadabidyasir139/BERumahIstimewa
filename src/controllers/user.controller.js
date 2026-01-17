@@ -1,7 +1,6 @@
 const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 
-// Get user profile
 exports.getProfile = (req, res) => {
   const userId = req.user.id;
 
@@ -34,23 +33,20 @@ exports.getProfile = (req, res) => {
   );
 };
 
-// Update user profile
 exports.updateProfile = (req, res) => {
   const userId = req.user.id;
   const { name, email, phone } = req.body;
-  const photo = req.file ? req.file.location : null; // Use location for S3 URL
+  const photo = req.file ? req.file.location : null;
 
   console.log("Update profile - req.file:", req.file);
   console.log("Update profile - photo value:", photo);
 
-  // Check if at least one field is provided
   if (!name && !email && phone === undefined && !photo) {
     return res
       .status(400)
       .json({ message: "Setidaknya satu field harus diisi" });
   }
 
-  // If email is provided, check if it's already used by another user
   if (email) {
     db.query(
       "SELECT id FROM users WHERE email = $1 AND id != $2",
@@ -65,17 +61,14 @@ exports.updateProfile = (req, res) => {
           return res.status(400).json({ message: "Email sudah digunakan" });
         }
 
-        // Proceed to update
         performUpdate();
       }
     );
   } else {
-    // No email provided, proceed to update
     performUpdate();
   }
 
   function performUpdate() {
-    // Update profil
     const updateFields = [];
     const updateValues = [];
     let paramCount = 1;
@@ -121,7 +114,6 @@ exports.updateProfile = (req, res) => {
   }
 };
 
-// Change password
 exports.changePassword = (req, res) => {
   const userId = req.user.id;
   const { currentPassword, newPassword } = req.body;
@@ -138,7 +130,6 @@ exports.changePassword = (req, res) => {
       .json({ message: "Password baru minimal 6 karakter" });
   }
 
-  // Ambil password saat ini dari database
   db.query(
     "SELECT password FROM users WHERE id = $1",
     [userId],
@@ -154,16 +145,13 @@ exports.changePassword = (req, res) => {
 
       const user = result.rows[0];
 
-      // Verifikasi password saat ini
       const passwordMatch = bcrypt.compareSync(currentPassword, user.password);
       if (!passwordMatch) {
         return res.status(400).json({ message: "Password saat ini salah" });
       }
 
-      // Hash password baru
       const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
 
-      // Update password
       db.query(
         "UPDATE users SET password = $1 WHERE id = $2",
         [hashedNewPassword, userId],
@@ -180,7 +168,6 @@ exports.changePassword = (req, res) => {
   );
 };
 
-// Get transaction history
 exports.getTransactionHistory = (req, res) => {
   const userId = req.user.id;
 
@@ -215,10 +202,9 @@ exports.getTransactionHistory = (req, res) => {
   });
 };
 
-// Get transaction detail
 exports.getTransactionDetail = (req, res) => {
   const userId = req.user.id;
-  const { id } = req.params; // transactionId
+  const { id } = req.params;
 
   const query = `
     SELECT

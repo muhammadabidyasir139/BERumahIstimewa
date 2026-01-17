@@ -2,18 +2,10 @@ const multer = require("multer");
 const multerS3 = require("multer-s3");
 const { s3, bucketName } = require("../config/s3");
 
-// Debug logging
-console.log("Upload middleware - bucketName:", bucketName);
-console.log(
-  "Upload middleware - available env vars:",
-  Object.keys(process.env).filter((key) => key.startsWith("AWS_"))
-);
-
-// Gunakan S3 storage untuk upload
 const storage = multerS3({
   s3: s3,
-  bucket: bucketName || "rumahistimewa", // fallback to hardcoded bucket name
-  acl: "public-read", // agar bisa diakses publik
+  bucket: bucketName || "rumahistimewa",
+  acl: "public-read",
   contentType: (req, file, cb) => {
     cb(null, "image/jpeg");
   },
@@ -30,7 +22,6 @@ const storage = multerS3({
   },
 });
 
-// hanya izinkan gambar
 const fileFilter = (req, file, cb) => {
   const allowed = ["image/jpeg", "image/png", "image/jpg"];
   if (!allowed.includes(file.mimetype)) {

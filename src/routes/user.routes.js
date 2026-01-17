@@ -11,19 +11,14 @@ const {
   getTransactionDetail,
 } = require("../controllers/user.controller");
 
-// Get user profile
 router.get("/profile", verifyJWT, getProfile);
 
-// Update user profile (name, email, phone, photo)
 router.put("/profile", verifyJWT, upload.single("photo"), updateProfile);
 
-// Change password
 router.put("/change-password", verifyJWT, changePassword);
 
-// Get transaction history
 router.get("/transactions", verifyJWT, getTransactionHistory);
 
-// Get transaction detail
 router.get("/transactions/:id", verifyJWT, getTransactionDetail);
 
 module.exports = router;

@@ -1,12 +1,10 @@
 const db = require("../config/db");
 const { s3, bucketName } = require("../config/s3");
 
-// Helper for S3 URL
 const getS3Url = (filename) => {
   return `${s3.endpoint.href}${bucketName}/${filename}`;
 };
 
-// GET ALL VILLAS
 exports.getAllVillas = (req, res) => {
   const query = `
     SELECT v.*, string_agg(vp.fileName, ',') AS photos
@@ -20,7 +18,6 @@ exports.getAllVillas = (req, res) => {
     if (err)
       return res.status(500).json({ message: "Gagal mengambil data villa" });
 
-    // ubah string "f1.jpg,f2.jpg" -> array URL
     const data = result.rows.map((row) => {
       let photos = [];
       if (row.photos) {
@@ -72,9 +69,7 @@ exports.createVillaByAdmin = async (req, res) => {
       });
     }
 
-    // Insert photos using individual queries (Promise.all) for compatibility/simplicity
     const photoPromises = files.map((file) => {
-      // Use file.key for S3 (provided by multer-s3), fallback to filename if local
       const key = file.key || file.filename;
       return db.query(
         "INSERT INTO villa_photos (villaId, fileName) VALUES ($1, $2)",
@@ -97,7 +92,6 @@ exports.createVillaByAdmin = async (req, res) => {
   }
 };
 
-// EDIT VILLA
 exports.editVilla = async (req, res) => {
   const { id } = req.params;
   const { name, location, price, description } = req.body;
@@ -127,7 +121,6 @@ exports.editVilla = async (req, res) => {
       return res.status(404).json({ message: "Villa tidak ditemukan" });
     }
 
-    // If there are new photos, insert them
     if (files.length > 0) {
       const photoPromises = files.map((file) => {
         const key = file.key || file.filename;
@@ -141,7 +134,6 @@ exports.editVilla = async (req, res) => {
 
     const updatedVilla = result.rows[0];
 
-    // Get updated photos list
     const photosResult = await db.query(
       "SELECT fileName FROM villa_photos WHERE villaId = $1",
       [id]
@@ -161,7 +153,6 @@ exports.editVilla = async (req, res) => {
   }
 };
 
-// APPROVE VILLA
 exports.approveVilla = (req, res) => {
   const { id } = req.params;
 
@@ -180,7 +171,6 @@ exports.approveVilla = (req, res) => {
   );
 };
 
-// REJECT VILLA
 exports.rejectVilla = (req, res) => {
   const { id } = req.params;
 
@@ -199,7 +189,6 @@ exports.rejectVilla = (req, res) => {
   );
 };
 
-// SET INACTIVE VILLA
 exports.inactiveVilla = (req, res) => {
   const { id } = req.params;
 
@@ -219,7 +208,6 @@ exports.inactiveVilla = (req, res) => {
   );
 };
 
-// DELETE VILLA
 exports.deleteVilla = (req, res) => {
   const { id } = req.params;
 
@@ -234,7 +222,6 @@ exports.deleteVilla = (req, res) => {
   });
 };
 
-// GET ALL USERS
 exports.getAllUsers = (req, res) => {
   db.query("SELECT id, name, email, role, status FROM users", (err, result) => {
     if (err) return res.status(500).json({ message: "Gagal mengambil user" });
@@ -247,7 +234,6 @@ exports.getAllUsers = (req, res) => {
   });
 };
 
-// UPDATE USER STATUS
 exports.updateUserStatus = (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -272,29 +258,21 @@ exports.updateUserStatus = (req, res) => {
   );
 };
 
-// GET REVENUE - Total transactions with status 'settlement' or 'capture', filterable by period
 exports.getRevenue = (req, res) => {
-  const { period, startDate, endDate } = req.query; // 'day', 'week', 'month' or undefined for all time, or custom range
+  const { period, startDate, endDate } = req.query;
 
   let dateFilter = "";
   let params = [];
   let paramCount = 1;
 
-  // Status must be paid (settlement or capture)
-  // We use IN clause directly in query string for simplicity or parameterized if needed,
-  // but since these are constant strings it's safe to hardcode the condition.
-  // The original code used 'paid' which might not match Midtrans statuses directly.
   const statusCondition = "p.transactionstatus IN ('settlement', 'capture')";
 
   if (startDate && endDate) {
-    // Custom range
     dateFilter = `AND p.transactiontime::DATE >= $${paramCount++} AND p.transactiontime::DATE <= $${paramCount++}`;
     params.push(startDate, endDate);
   } else if (period === "day") {
     dateFilter = "AND p.transactiontime::DATE = CURRENT_DATE";
   } else if (period === "week") {
-    // Current week (starting monday usually, or just last 7 days?)
-    // date_trunc('week', ...) in Postgres starts on Monday by default
     dateFilter = "AND p.transactiontime >= date_trunc('week', CURRENT_DATE)";
   } else if (period === "month") {
     dateFilter = "AND p.transactiontime >= date_trunc('year', CURRENT_DATE)";
@@ -311,7 +289,6 @@ exports.getRevenue = (req, res) => {
     WHERE ${statusCondition} ${dateFilter}
   `;
 
-  // Additional query for breakdown if period is 'week' or 'month'
   let breakdownQuery = "";
   if (period === "week") {
     breakdownQuery = `
@@ -360,12 +337,10 @@ exports.getRevenue = (req, res) => {
       db.query(breakdownQuery, params, (err2, result2) => {
         if (err2) {
           console.log(err2);
-          // Don't fail the whole request, just return main stats
           return res.json(responseData);
         }
 
         if (period === "week") {
-          // Initialize all days with 0
           const days = [
             "Monday",
             "Tuesday",
@@ -386,7 +361,6 @@ exports.getRevenue = (req, res) => {
 
           responseData.data.weeklyBreakdown = weeklyBreakdown;
         } else if (period === "month") {
-          // Initialize all months with 0
           const months = [
             "January",
             "February",
@@ -421,7 +395,6 @@ exports.getRevenue = (req, res) => {
   });
 };
 
-// GET ALL TRANSACTIONS
 exports.getAllTransactions = (req, res) => {
   const { page = 1, limit = 10, status, startDate, endDate } = req.query;
   const offset = (page - 1) * limit;
@@ -445,7 +418,6 @@ exports.getAllTransactions = (req, res) => {
     params.push(endDate);
   }
 
-  // Get total count and revenue
   const statsQuery = `
     SELECT 
       COUNT(*) as total,
@@ -457,7 +429,6 @@ exports.getAllTransactions = (req, res) => {
     WHERE 1=1 ${whereClause}
   `;
 
-  // Get transactions with pagination
   const dataQuery = `
     SELECT
       p.orderId,
@@ -481,7 +452,6 @@ exports.getAllTransactions = (req, res) => {
     LIMIT $${paramCount++} OFFSET $${paramCount++}
   `;
 
-  // Clone params for count query avoiding limit/offset
   const countParams = [...params];
 
   params.push(parseInt(limit), parseInt(offset));
